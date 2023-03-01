@@ -495,10 +495,9 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 }
 
 func getCategoriesByParentID(q sqlx.Queryer, parentCategoryID int) (categoryIDs []int, err error) {
-	//err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
 
 	for _, category := range categoriesCache {
-		if category.ID == parentCategoryID {
+		if category.ParentID == parentCategoryID {
 			categoryIDs = append(categoryIDs, category.ID)
 		}
 
