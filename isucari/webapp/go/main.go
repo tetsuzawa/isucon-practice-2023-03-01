@@ -230,18 +230,18 @@ func initCategories() {
 				categoryName = col
 			}
 		}
-		categories[id] = Category{
+		categoriesCache[id] = Category{
 			ID:           id,
 			ParentID:     parentId,
 			CategoryName: categoryName,
 			//ParentCategoryName: "",
 		}
 	}
-	fmt.Println(categories)
+	fmt.Println(categoriesCache)
 }
 
 // map[id]Category
-var categories = make(map[int]Category)
+var categoriesCache = make(map[int]Category)
 
 type reqInitialize struct {
 	PaymentServiceURL  string `json:"payment_service_url"`
@@ -482,7 +482,7 @@ func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err
 
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
 	//err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
-	category = categories[categoryID]
+	category = categoriesCache[categoryID]
 
 	if category.ParentID != 0 {
 		parentCategory, err := getCategoryByID(q, category.ParentID)
@@ -492,6 +492,18 @@ func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err err
 		category.ParentCategoryName = parentCategory.CategoryName
 	}
 	return category, err
+}
+
+func getCategoriesByParentID(q sqlx.Queryer, parentCategoryID int) (categoryIDs []int, err error) {
+	//err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
+
+	for _, category := range categoriesCache {
+		if category.ID == parentCategoryID {
+			categoryIDs = append(categoryIDs, category.ID)
+		}
+
+	}
+	return categoryIDs, err
 }
 
 func getConfigByName(name string) (string, error) {
@@ -690,7 +702,8 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var categoryIDs []int
-	err = dbx.Select(&categoryIDs, "SELECT id FROM `categories` WHERE parent_id=?", rootCategory.ID)
+	//err = dbx.Select(&categoryIDs, "SELECT id FROM `categories` WHERE parent_id=?", rootCategory.ID)
+	categoryIDs, err = getCategoriesByParentID(nil, rootCategory.ID)
 	if err != nil {
 		log.Print(err)
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
