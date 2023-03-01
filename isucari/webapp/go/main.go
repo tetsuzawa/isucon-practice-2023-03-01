@@ -2243,7 +2243,12 @@ func getSettings(w http.ResponseWriter, r *http.Request) {
 
 	categories := []Category{}
 
-	err := dbx.Select(&categories, "SELECT * FROM `categories`")
+// 	err := dbx.Select(&categories, "SELECT * FROM `categories`")
+    var categories: []Categories
+
+    for _, category := range categoriesCache {
+        categories = append(categories, category)
+    }
 	if err != nil {
 		log.Print(err)
 		outputErrorMsg(w, http.StatusInternalServerError, "db error")
