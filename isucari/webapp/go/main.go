@@ -736,7 +736,7 @@ func getNewCategoryItems(w http.ResponseWriter, r *http.Request) {
 		// paging
 		inQuery, inArgs, err = sqlx.In(
 			//"SELECT * FROM `items` WHERE `status` IN (?,?) AND category_id IN (?) AND (`created_at` < ?  OR (`created_at` <= ? AND `id` < ?)) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
-			"(SELECT * FROM `items` WHERE `status` IN (?, ?) AND category_id IN (?) AND (`created_at` < ?)) UNION ALL (SELECT * FROM `items` WHERE `status` IN (?, ?) AND category_id IN (?) AND `created_at` <= ? AND `id` < ?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
+			"(SELECT * FROM `items` WHERE `status` IN (?, ?) AND category_id IN (?) AND (`created_at` < ?)) UNION DISTINCT (SELECT * FROM `items` WHERE `status` IN (?, ?) AND category_id IN (?) AND `created_at` <= ? AND `id` < ?) ORDER BY `created_at` DESC, `id` DESC LIMIT ?",
 			ItemStatusOnSale,
 			ItemStatusSoldOut,
 			categoryIDs,
