@@ -77,3 +77,8 @@ CREATE TABLE `categories` (
 CREATE INDEX items_status_category_id_created_at_id_index
     ON items (status ASC, category_id ASC, created_at DESC, id DESC);
 
+CREATE INDEX items_status_created_at_id_index
+    ON items (status ASC, created_at DESC, id DESC);
+
+CREATE INDEX items_seller_id_status_created_at_id_index
+    ON items (seller_id ASC, status ASC, created_at DESC, id DESC);
