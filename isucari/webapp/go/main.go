@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
@@ -468,17 +469,40 @@ func getUser(r *http.Request) (user User, errCode int, errMsg string) {
 	return user, http.StatusOK, ""
 }
 
+var getUserSimpleByIDCache = NewCache[int64, UserSimple]()
+
+// id, account_name, num_sell_items only
 func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err error) {
 	user := User{}
-	err = sqlx.Get(q, &user, "SELECT * FROM `users` WHERE `id` = ?", userID)
-	if err != nil {
-		return userSimple, err
+	us, ok := getUserSimpleByIDCache.Get(userID)
+	if !ok {
+		err = sqlx.Get(q, &user, "SELECT * FROM `users` WHERE `id` = ?", userID)
+		if err != nil {
+			return userSimple, err
+		}
+		userSimple.ID = user.ID
+		userSimple.AccountName = user.AccountName
+		userSimple.NumSellItems = user.NumSellItems
+
+		getUserSimpleByIDCache.Set(userID, userSimple)
+	} else {
+		userSimple = us
 	}
-	userSimple.ID = user.ID
-	userSimple.AccountName = user.AccountName
-	userSimple.NumSellItems = user.NumSellItems
+
 	return userSimple, err
 }
+
+//func getUserSimpleByID(q sqlx.Queryer, userID int64) (userSimple UserSimple, err error) {
+//	user := User{}
+//	err = sqlx.Get(q, &user, "SELECT * FROM `users` WHERE `id` = ?", userID)
+//	if err != nil {
+//		return userSimple, err
+//	}
+//	userSimple.ID = user.ID
+//	userSimple.AccountName = user.AccountName
+//	userSimple.NumSellItems = user.NumSellItems
+//	return userSimple, err
+//}
 
 func getCategoryByID(q sqlx.Queryer, categoryID int) (category Category, err error) {
 	//err = sqlx.Get(q, &category, "SELECT * FROM `categories` WHERE `id` = ?", categoryID)
@@ -2114,6 +2138,15 @@ func postSell(w http.ResponseWriter, r *http.Request) {
 	}
 	tx.Commit()
 
+	us, ok := getUserSimpleByIDCache.Get(seller.ID)
+	if ok {
+		getUserSimpleByIDCache.Set(seller.ID, UserSimple{
+			ID:           us.ID,
+			AccountName:  us.AccountName,
+			NumSellItems: us.NumSellItems + 1,
+		})
+	}
+
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 	json.NewEncoder(w).Encode(resSell{ID: itemID})
 }
@@ -2407,4 +2440,48 @@ func outputErrorMsg(w http.ResponseWriter, status int, msg string) {
 
 func getImageURL(imageName string) string {
 	return fmt.Sprintf("/upload/%s", imageName)
+}
+
+type cache[K comparable, V any] struct {
+	sync.RWMutex
+	items map[K]V
+}
+
+func NewCache[K comparable, V any]() *cache[K, V] {
+	m := make(map[K]V)
+	c := &cache[K, V]{
+		items: m,
+	}
+	return c
+}
+
+func (c *cache[K, V]) Set(key K, value V) {
+	c.Lock()
+	c.items[key] = value
+	c.Unlock()
+}
+
+func (c *cache[K, V]) Get(key K) (V, bool) {
+	c.RLock()
+	v, found := c.items[key]
+	c.RUnlock()
+	return v, found
+}
+
+func (c *cache[K, V]) Del(key K) {
+	c.Lock()
+	delete(c.items, key)
+	c.Unlock()
+}
+
+func (c *cache[K, V]) Keys() []K {
+	c.RLock()
+	res := make([]K, len(c.items))
+	i := 0
+	for k, _ := range c.items {
+		res[i] = k
+		i++
+	}
+	c.RUnlock()
+	return res
 }
